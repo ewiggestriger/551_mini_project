@@ -1,4 +1,5 @@
 import numpy as np
+import scipy.stats as sp
 
 
 class AnalyticRecords:
@@ -24,6 +25,10 @@ class AnalyticRecords:
 
     def get_streak_var(self):
         return np.var(self.streak)
+
+    def get_half_width(self, array):
+        hw = sp.t.ppf(1-0.05/2, len(array)-1) * np.sqrt(np.var(array)/len(array))
+        return hw
 
     # calculate confidence interval
     def calc_ci(self, mean, z, var, n):

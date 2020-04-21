@@ -12,24 +12,24 @@ import Player
 import Dealer
 
 # initialize the simulation
-cards = (2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10, 10, 11)
+cards = (2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10, 10, 11) # face cards are all value 10, except ace is 11
 dealt = ([0])
-n = 100  # number of games per simulation run
-r = 100  # number of simulation runs
-alpha = 0.05  # precision 95%
+n = 50  # number of games per simulation run
+r = 10000  # number of simulation runs
+alpha = 0.05  # precision 95% for confidence intervals
 min_bet = 5
 max_bet = 1000
-profit = 0
+profit = 0  # profit over betting, necessary for one of the strategies
 d_pot = 50000
-p1_pot = p2_pot = p3_pot = p4_pot = 500
-d_wins = p1_wins = p2_wins = p3_wins = p4_wins = 0
-d_losses = p1_losses = p2_losses = p3_losses = p4_losses = 0
-d_hand = ([0, 0])
+p1_pot = p2_pot = p3_pot = p4_pot = 500 # starting bankroll per player
+d_wins = p1_wins = p2_wins = p3_wins = p4_wins = 0 # starting player win record
+d_losses = p1_losses = p2_losses = p3_losses = p4_losses = 0 # starting player loss record
+d_hand = ([0, 0]) # initial hands are two-cards
 p1_hand = ([0, 0])
 p2_hand = ([0, 0])
 p3_hand = ([0, 0])
 p4_hand = ([0, 0])
-win_streak = 0  # default last win flag
+win_streak = 0  # default last win flag, necessary for one of the strategies
 # create players
 Player1 = Player.Player(p1_pot, min_bet, p1_wins, p1_losses, win_streak, profit)
 Player2 = Player.Player(p2_pot, min_bet, p2_wins, p2_losses, win_streak, profit)
@@ -61,11 +61,12 @@ def calc_z_val(alpha):
     return z
 
 
-def paired_t_method(array, alpha):
+# paired t method for system (strategy) comparison
+def paired_z_method(array, alpha):
     mean = np.mean(array)
-    t_val = stats.t.ppf(1-alpha/2, len(array)-1)
-    variance = np.var(array, ddof=1)
-    half_width = t_val * np.sqrt(variance/len(array))
+    z_val = stats.norm.ppf(1-alpha/2)
+    variance = np.var(array)
+    half_width = z_val * np.sqrt(variance/len(array))
     # construct CI
     ci_plus = mean + half_width
     ci_minus = mean - half_width
@@ -147,7 +148,7 @@ def d_strategy(d_hand, cards):
         p_hand = ([0, 0])
 
 
-# betting strategy
+# betting strategies
 def martingale_strategy(Player):
     # Martingale player follows Martingale strategy
     # get bet level and last win flag
@@ -220,11 +221,13 @@ def safe_bet_strategy(Player):
 # assess game outcome
 def assess_game_outcome(hand, d_hand, Player, Dealer):
     # assess player
+    winner = None
+    loser = None
     if sum(hand) == 0:
         # player automatically loses on a bust before dealer draws
         winner = d_hand
         loser = hand
-    elif sum(d_hand) <= sum(hand):
+    elif sum(d_hand) < sum(hand):
         winner = hand
         loser = d_hand
     else:
@@ -238,12 +241,16 @@ def assess_game_outcome(hand, d_hand, Player, Dealer):
         Player.set_win_streak(1)
         Player.set_pot(Player.get_bet())
         Dealer.set_pot(-Player.get_bet())
-    else:
+    elif loser == hand:
         # print("Player loses")
         Player.set_losses(1)
         Player.set_win_streak(-1)
         Player.set_pot(-Player.get_bet())
         Dealer.set_pot(Player.get_bet())
+    else:
+        # will count as loss but pot is not deducted
+        Player.set_losses(1)
+        Player.set_win_streak(-1)
     # reset hands to zero
     del hand[2:]
     del d_hand[2:]
@@ -252,7 +259,7 @@ def assess_game_outcome(hand, d_hand, Player, Dealer):
 # run required number of simulation runs
 for y in range(r):
     for x in range(n):
-        print("Round " + str(x))
+        # print("Round " + str(x))
         # conduct betting first
         martingale_strategy(Player1)
         manhattan_strategy(Player2)
@@ -305,12 +312,16 @@ z_val = calc_z_val(alpha)
 # martingale strategy
 print("Martingale strategy pot: mean " + str(Martingale_Stats.get_pot_mean()) + ", var " + str(Martingale_Stats.get_pot_var()))
 print("Martingale strategy win/loss: mean " + str(Martingale_Stats.get_winloss_mean()) + ", var " + str(Martingale_Stats.get_winloss_var()))
+print("Martingale strategy streak: mean " + str(Martingale_Stats.get_streak_mean()) + ", var " + str(Martingale_Stats.get_streak_var()))
 print("Manhattan strategy pot: mean " + str(Manhattan_Stats.get_pot_mean()) + ", var " + str(Manhattan_Stats.get_pot_var()))
 print("Manhattan strategy win/loss: mean " + str(Manhattan_Stats.get_winloss_mean()) + ", var " + str(Manhattan_Stats.get_winloss_var()))
+print("Manhattan strategy streak: mean " + str(Manhattan_Stats.get_streak_mean()) + ", var " + str(Manhattan_Stats.get_streak_var()))
 print("Oscar's Grind strategy pot: mean " + str(Oscar_Stats.get_pot_mean()) + ", var " + str(Oscar_Stats.get_pot_var()))
 print("Oscar's Grind strategy win/loss: mean " + str(Oscar_Stats.get_winloss_mean()) + ", var " + str(Oscar_Stats.get_winloss_var()))
+print("Oscar's Grind strategy streak: mean " + str(Oscar_Stats.get_streak_mean()) + ", var " + str(Oscar_Stats.get_streak_var()))
 print("Safe strategy pot: mean " + str(Safe_Stats.get_pot_mean()) + ", var " + str(Safe_Stats.get_pot_var()))
 print("Safe strategy win/loss: mean " + str(Safe_Stats.get_winloss_mean()) + ", var " + str(Safe_Stats.get_winloss_var()))
+print("Safe strategy streak: mean " + str(Safe_Stats.get_streak_mean()) + ", var " + str(Safe_Stats.get_streak_var()))
 print("Martingale strategy pot confidence interval " + str(Martingale_Stats.calc_ci(Martingale_Stats.get_pot_mean(), z_val, Martingale_Stats.get_pot_var(), r)))
 print("Manhattan strategy pot confidence interval " + str(Manhattan_Stats.calc_ci(Martingale_Stats.get_pot_mean(), z_val, Manhattan_Stats.get_pot_var(), r)))
 print("Oscar's Grind strategy pot confidence interval " + str(Oscar_Stats.calc_ci(Oscar_Stats.get_pot_mean(), z_val, Oscar_Stats.get_pot_var(), r)))
@@ -323,15 +334,74 @@ compare_Mart_Saf = np.subtract(martingale_pot, safe_pot)
 compare_Man_Osc = np.subtract(manhattan_pot, oscars_pot)
 compare_Man_Saf = np.subtract(manhattan_pot, safe_pot)
 compare_Osc_Saf = np.subtract(oscars_pot, safe_pot)
+# change alpha value due to Bonferroni inequality
+alpha = alpha / 6
 print("Comparing Martingale Strategy with Manhattan Strategy:")
-paired_t_method(compare_Mart_Man, alpha)
+paired_z_method(compare_Mart_Man, alpha)
 print("Comparing Martingale Strategy with Oscar's Grind Strategy:")
-paired_t_method(compare_Mart_Osc, alpha)
+paired_z_method(compare_Mart_Osc, alpha)
 print("Comparing Martingale Strategy with Safe Strategy:")
-paired_t_method(compare_Mart_Saf, alpha)
+paired_z_method(compare_Mart_Saf, alpha)
 print("Comparing Manhattan Strategy with Oscar's Grind Strategy:")
-paired_t_method(compare_Man_Osc, alpha)
+paired_z_method(compare_Man_Osc, alpha)
 print("Comparing Manhattan Strategy with Safe Strategy:")
-paired_t_method(compare_Man_Saf, alpha)
+paired_z_method(compare_Man_Saf, alpha)
 print("Comparing Oscar's Grind Strategy with Safe Strategy:")
-paired_t_method(compare_Osc_Saf, alpha)
+paired_z_method(compare_Osc_Saf, alpha)
+# part C - graphs and charts
+# chart the pot winnings of each strategy against each other
+fig, ax = plt.subplots()
+
+ax.plot(martingale_pot, label='Martingale Winnings' )
+ax.plot(manhattan_pot, label='Manhattan Winnings')
+ax.plot(oscars_pot, label='Oscars Grind Winnings')
+ax.plot(safe_pot, label='Safe Strategy Winnings')
+ax.set(xlabel='Simulation Run', ylabel='Winnings in Dollars', title='Plot of Strategy Total Winnings')
+ax.grid()
+ax.legend()
+fig.savefig("pot.png")
+plt.show()
+
+# chart the win/loss ratio of each strategy against each other
+fig2, ax2 = plt.subplots()
+
+ax2.plot(martingale_winloss, label='Martingale Win/Loss Balance')
+ax2.plot(manhattan_winloss, label='Manhattan Win/Loss Balance')
+ax2.plot(oscars_winloss, label='Oscars Grind Win/Loss Balance')
+ax2.plot(safe_winloss, label='Safe Strategy Win/Loss Balance')
+ax2.set(xlabel='Simulation Run', ylabel='Win/Loss Balance', title='Plot of Win/Loss Balance')
+ax2.grid()
+ax2.legend()
+fig2.savefig("winloss.png")
+plt.show()
+
+# chart the win streak
+fig3, ax3 = plt.subplots()
+ax3.plot(martingale_streak, label='Martingale Win Streak Balance')
+ax3.plot(manhattan_streak, label='Manhattan Win Streak Balance')
+ax3.plot(oscars_streak, label='Oscars Grind Win Streak Balance')
+ax3.plot(safe_streak, label='Safe Strategy Win Streak Balance')
+ax3.set(xlabel='Simulation Run', ylabel='Win Streak Balance', title='Plot of Win Streak Balance')
+ax3.grid()
+ax3.legend()
+fig3.savefig("streak.png")
+plt.show()
+
+# histogram of pot winnings
+fig4, axs = plt.subplots(2,2)
+axs[0,0].hist(martingale_pot, bins=20)
+axs[0,0].set_title('Martingale')
+axs[0,1].hist(manhattan_pot, bins=20, color='orange')
+axs[0,1].set_title('Manhattan')
+axs[1,0].hist(oscars_pot, bins=20, color='green')
+axs[1,0].set_title('Oscars Grind')
+axs[1,1].hist(safe_pot, bins=20, color='yellow')
+axs[1,1].set_title('Safe Strategy')
+
+for ax in axs.flat:
+    ax.set(xlabel='Pot Winnings', ylabel='Number of Sim Runs')
+    ax.grid()
+
+fig4.savefig("histo.png")
+plt.show()
+
